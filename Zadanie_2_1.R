@@ -79,7 +79,9 @@ subpages <- page %>% html_nodes(".e19uumca11 , .optimus-app-1t3tmog+ .optimus-ap
 
 ###  na potrzeby testow:
 subpages <- 4
-cars <-  data.frame()
+# cars <-  data.frame()
+
+
 start_exec <- Sys.time()
 
 for(page_no in 1: subpages ) {
