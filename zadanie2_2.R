@@ -1,8 +1,11 @@
 library(rvest)
 library(dplyr)
 library(plyr)
+library(DBI)
+library(RSQLite)
 
 
+ 
 
 # zamiana pobranych parametrów jako lista na obiekt DataFrame
 convert_params_to_df <-function(params){
@@ -67,21 +70,59 @@ get_params <- function(car_link ){
   return (params_final_df)
 }
 
+# zapis do bazy danych
+writeToDb <- function (carsDf, tableName) {
+  
+  columnNames<-names(carsDf)
+  
+  dbConn<-dbConnect(SQLite(),"cars.sqlite")
+  
+  
+  #### sprawdzenie czy istnieje tabela i jak tak to pobranie z niej listy kolumn
+  # a jak nie ma to przypisuje z DataFrame - nie ma jeszcze tabeli, alter nie ma sensu
+  # kolumny zostaną stworzone insertem
+  
+  if ( dbExistsTable(dbConn, tableName) ) {
+    dbColumns <- dbListFields(dbConn, tableName )
+  } else {
+    dbColumns <- columnNames
+  }
+  
+  
+  # dodanie brakujących kolumn gdy są jakieś nowe w DataFrame:
+  
+  for (columnName in  setdiff (columnNames, dbColumns ) )  {
+    
+    sql <-  paste("ALTER TABLE suv ADD COLUMN", columnName , "text;")
+    #print(sql)
+    dbExecute(dbConn, sql)
+  }
+  
+  dbWriteTable(dbConn,name=tableName,value=carsDf,append=TRUE,overwrite=FALSE)
+  dbDisconnect(dbConn)
+}
+
 # link outomoto z ktorego będą pobierane ogłoszenia
 otomoto_link <- "https://www.otomoto.pl/osobowe/seg-suv"
 
 
 cars <-  data.frame()
 page <-  read_html(otomoto_link)
+ 
 
 # liczba stron ogłoszeń
-#subpages <- page %>% html_nodes(".e19uumca11 , .optimus-app-1t3tmog+ .optimus-app-wak9h6 span" ) %>% .[[2]] %>% html_text2()
-
 subpages <- page %>% html_nodes(".ooa-1t3tmog+ .ooa-wak9h6 span" )  %>% html_text2()
 
+#co ile stron wrzuca do bazy danych:
+subpagesToDB <- 3
+#licznik stron wczytanych do DataFrame
+cntPagesToDF <- 0
+# nazwa tabeli do ktorej wrzucam ogłoszenia:
+tableName <- 'SUV'
+
 ###  na potrzeby testow:
-subpages <- 4
-# cars <-  data.frame()
+subpages <- 5
+cars <-  data.frame()
 
 
 start_exec <- Sys.time()
@@ -110,7 +151,7 @@ for(page_no in 1: subpages ) {
   }
   
   # pobranie szczegółów ogłoszenia do DataFrame
-  if (length(car_links) ) {
+  if (length(car_links)>0 ) {
     for (i in 1: length(car_links)) {
       
       if (  startsWith( car_links[i], 'https://www.otomoto.pl/oferta' )    ) {
@@ -125,13 +166,38 @@ for(page_no in 1: subpages ) {
     
     
     print(paste("Czas wykonywania do tej pory:", Sys.time()- start_exec   ))
+    cntPagesToDF <- cntPagesToDF + 1
   }
+  
+  if ( cntPagesToDF %% subpagesToDB ==0 ||  page_no==subpages) {
+ 
+    print(paste("zapis do bazy",    nrow(cars) , "rekordów" ))
+    writeToDb(cars,tableName)
+    
+    #zerowanie
+    cntPagesToDF <- 0
+    cars <-  data.frame()
+  }
+  
 } 
+ 
 
 
 
-# DF z pobranymi ogłoszeniami
-View(cars)
+###############################################
+#   usunięcie bazy                            #
+#                                             #
+#   dbConn<-dbConnect(SQLite(),"cars.sqlite") #
+#   dbRemoveTable(dbConn, 'SUV')
+#   dbDisconnect(dbConn)                      #
+###############################################
+
+ 
+ 
+
+
+
+
 
 
  
