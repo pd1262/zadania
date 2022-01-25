@@ -89,15 +89,17 @@ for(page_no in 1: subpages ) {
   print( paste("Strona:", page_no,"start",print(Sys.time())))
   
   # wczytanie strony ze szczegółami ogłoszenia
+  cnt <- 0
+  
   repeat {
-    cnt <- 0
+ 
     link = paste0(otomoto_link,"?page=",page_no)
     page = read_html(link)
     car_links <-  page %>% html_nodes(".e1b25f6f13.optimus-app-1mgjl0z-Text.eu5v0x0 a") %>% html_attr("href")
     
     print(paste( link," => " ,length(car_links)))
     cnt <- cnt +1
-    if(length(car_links) || cnt>=3)  {
+    if(cnt>=3)  {
       break
     }
   }
